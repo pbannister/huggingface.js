@@ -139,6 +139,15 @@ function isUnslothModel(model: ModelData) {
 	return model.tags.includes("unsloth") || isLlamaCppGgufModel(model);
 }
 
+function isEmbeddingModel(model: ModelData): boolean {
+	return (
+		!model.tags.includes("decision-model") &&
+		(model.tags.includes("feature-extraction") ||
+			model.pipeline_tag === "feature-extraction" ||
+			model.pipeline_tag === "sentence-similarity")
+	);
+}
+
 function isToolCallingLocalAgentModel(model: ModelData): boolean {
 	return (
 		(isLlamaCppGgufModel(model) || isMlxModel(model)) &&
@@ -159,51 +168,56 @@ function getQuantTag(filepath?: string): string {
 }
 
 const snippetLlamacpp = (model: ModelData, filepath?: string): LocalAppSnippet[] => {
+	const isEmbedding = isEmbeddingModel(model);
 	const serverCommand = (binary: string) => {
-		const snippet = [
-			"# Start a local OpenAI-compatible server with a web UI:",
-			`${binary} -hf ${model.id}${getQuantTag(filepath)}`,
-		];
+		const snippet = isEmbedding
+			? [
+					"# Start a local OpenAI-compatible embeddings server:",
+					`${binary} -hf ${model.id}${getQuantTag(filepath)} --embeddings`,
+				]
+			: [
+					"# Start a local OpenAI-compatible server with a web UI:",
+					`${binary} -hf ${model.id}${getQuantTag(filepath)}`,
+				];
 		return snippet.join("\n");
 	};
 	const cliCommand = (binary: string) => {
 		const snippet = ["# Run inference directly in the terminal:", `${binary} -hf ${model.id}${getQuantTag(filepath)}`];
 		return snippet.join("\n");
 	};
+	// Embedding models don't generate text, so there is no CLI command for them
+	const commands = (serverBinary: string, cliBinary: string) =>
+		isEmbedding ? [serverCommand(serverBinary)] : [serverCommand(serverBinary), cliCommand(cliBinary)];
 	return [
 		{
 			title: "Install (macOS, Linux)",
 			setup: "curl -LsSf https://llama.app/install.sh | sh",
-			content: [serverCommand("llama serve"), cliCommand("llama cli")],
+			content: commands("llama serve", "llama cli"),
 		},
 		{
 			title: "Install from WinGet (Windows)",
 			setup: "winget install llama.cpp",
-			content: [serverCommand("llama serve"), cliCommand("llama cli")],
-		},
-		{
-			title: "Use pre-built binary",
-			setup: [
-				// prettier-ignore
-				"# Download pre-built binary from:",
-				"# https://github.com/ggerganov/llama.cpp/releases",
-			].join("\n"),
-			content: [serverCommand("./llama-server"), cliCommand("./llama-cli")],
+			content: commands("llama serve", "llama cli"),
 		},
 		{
 			title: "Build from source code",
 			setup: [
-				"git clone https://github.com/ggerganov/llama.cpp.git",
+				"git clone https://github.com/ggml-org/llama.cpp.git",
 				"cd llama.cpp",
 				"cmake -B build",
-				"cmake --build build -j --target llama-server llama-cli",
+				"cmake --build build -j --target llama-app",
 			].join("\n"),
-			content: [serverCommand("./build/bin/llama-server"), cliCommand("./build/bin/llama-cli")],
+			content: commands("./build/bin/llama serve", "./build/bin/llama cli"),
 		},
-		{
-			title: "Use Docker",
-			content: snippetDockerModelRunner(model, filepath),
-		},
+		// `docker model run` starts a chat session, which embedding models don't support
+		...(isEmbedding
+			? []
+			: [
+					{
+						title: "Use Docker",
+						content: snippetDockerModelRunner(model, filepath),
+					},
+				]),
 	];
 };
 
@@ -222,57 +236,10 @@ const snippetNodeLlamaCppCli = (model: ModelData, filepath?: string): LocalAppSn
 };
 
 const snippetOllama = (model: ModelData, filepath?: string): string => {
-	return `ollama run hf.co/${model.id}${getQuantTag(filepath)}`;
-};
-
-const snippetUnsloth = (model: ModelData): LocalAppSnippet[] => {
-	const isGguf = isLlamaCppGgufModel(model);
-
-	const studio_content = [
-		"# Run unsloth studio",
-		"unsloth studio -H 0.0.0.0 -p 8888",
-		"# Then open http://localhost:8888 in your browser",
-		"# Search for " + model.id + " to start chatting",
-	].join("\n");
-
-	const studio_instructions: LocalAppSnippet = {
-		title: "Install Unsloth Studio (macOS, Linux, WSL)",
-		setup: "curl -fsSL https://unsloth.ai/install.sh | sh",
-		content: studio_content,
-	};
-
-	const studio_instructions_windows: LocalAppSnippet = {
-		title: "Install Unsloth Studio (Windows)",
-		setup: "irm https://unsloth.ai/install.ps1 | iex",
-		content: studio_content,
-	};
-
-	const hf_spaces_instructions: LocalAppSnippet = {
-		title: "Using HuggingFace Spaces for Unsloth",
-		setup: "# No setup required",
-		content:
-			"# Open https://huggingface.co/spaces/unsloth/studio in your browser\n# Search for " +
-			model.id +
-			" to start chatting",
-	};
-
-	const fastmodel_instructions: LocalAppSnippet = {
-		title: "Load model with FastModel",
-		setup: "pip install unsloth",
-		content: [
-			"from unsloth import FastModel",
-			"model, tokenizer = FastModel.from_pretrained(",
-			'    model_name="' + model.id + '",',
-			"    max_seq_length=2048,",
-			")",
-		].join("\n"),
-	};
-
-	if (isGguf) {
-		return [studio_instructions, studio_instructions_windows, hf_spaces_instructions];
-	} else {
-		return [studio_instructions, studio_instructions_windows, hf_spaces_instructions, fastmodel_instructions];
-	}
+	// The Hub also accepts full filenames as Ollama tags. Unlike a quantization
+	// label, this identifies the selected file even with nonstandard filenames.
+	const tag = filepath && !filepath.includes("/") ? `:${filepath}` : getQuantTag(filepath);
+	return `ollama run hf.co/${model.id}${tag}`;
 };
 
 const snippetLocalAI = (model: ModelData, filepath?: string): LocalAppSnippet[] => {
@@ -439,7 +406,7 @@ const snippetTgi = (model: ModelData): LocalAppSnippet[] => {
 const snippetMlxLm = (model: ModelData): LocalAppSnippet[] => {
 	const openaiCurl = [
 		"# Calling the OpenAI-compatible server with curl",
-		`curl -X POST "http://localhost:8000/v1/chat/completions" \\`,
+		`curl -X POST "http://localhost:8080/v1/chat/completions" \\`,
 		`   -H "Content-Type: application/json" \\`,
 		`   --data '{`,
 		`     "model": "${model.id}",`,
@@ -471,6 +438,8 @@ const snippetMlxLm = (model: ModelData): LocalAppSnippet[] => {
 	];
 };
 
+const getLocalServerPort = (model: ModelData): number => (isMlxModel(model) ? 8080 : 9931);
+
 const getLocalServerStep = (model: ModelData, filepath?: string): LocalAppSnippet => {
 	return isMlxModel(model)
 		? {
@@ -494,7 +463,7 @@ const snippetPi = (model: ModelData, filepath?: string): LocalAppSnippet[] => {
 		{
 			providers: {
 				[isMLX ? "mlx-lm" : "llama-cpp"]: {
-					baseUrl: "http://localhost:8080/v1",
+					baseUrl: `http://localhost:${getLocalServerPort(model)}/v1`,
 					api: "openai-completions",
 					apiKey: "none",
 					models: [{ id: modelId }],
@@ -509,7 +478,7 @@ const snippetPi = (model: ModelData, filepath?: string): LocalAppSnippet[] => {
 		serverStep,
 		{
 			title: "Configure the model in Pi",
-			setup: "# Install Pi:\nnpm install -g @mariozechner/pi-coding-agent",
+			setup: "# Install Pi:\nnpm install -g @earendil-works/pi-coding-agent",
 			content: `# Add to ~/.pi/agent/models.json:\n${modelsJson}`,
 		},
 		{
@@ -535,13 +504,44 @@ const snippetHermesAgent = (model: ModelData, filepath?: string): LocalAppSnippe
 			content: [
 				"# Point Hermes at the local server:",
 				"hermes config set model.provider custom",
-				"hermes config set model.base_url http://127.0.0.1:8080/v1",
+				`hermes config set model.base_url http://127.0.0.1:${getLocalServerPort(model)}/v1`,
 				`hermes config set model.default ${modelId}`,
 			].join("\n"),
 		},
 		{
 			title: "Run Hermes",
 			content: "hermes",
+		},
+	];
+};
+
+const snippetOpenClaw = (model: ModelData, filepath?: string): LocalAppSnippet[] => {
+	const isMLX = isMlxModel(model);
+	const providerId = isMLX ? "mlx-lm" : "llama-cpp";
+	const modelId = isMLX ? model.id : `${model.id}${getQuantTag(filepath)}`;
+	const serverStep = getLocalServerStep(model, filepath);
+
+	return [
+		serverStep,
+		{
+			title: "Configure OpenClaw",
+			setup: "# Install OpenClaw:\nnpm install -g openclaw@latest",
+			content: [
+				"# Register the local server and set it as the default model:",
+				"openclaw onboard --non-interactive --mode local \\",
+				"  --auth-choice custom-api-key \\",
+				`  --custom-base-url http://127.0.0.1:${getLocalServerPort(model)}/v1 \\`,
+				`  --custom-model-id "${modelId}" \\`,
+				`  --custom-provider-id ${providerId} \\`,
+				"  --custom-compatibility openai \\",
+				"  --custom-text-input \\",
+				"  --accept-risk \\",
+				"  --skip-health",
+			].join("\n"),
+		},
+		{
+			title: "Run OpenClaw",
+			content: `openclaw agent --local --agent main --message "Hello from Hugging Face"`,
 		},
 	];
 };
@@ -604,10 +604,21 @@ const snippetLemonade = (model: ModelData, filepath?: string): LocalAppSnippet[]
 export const LOCAL_APPS = {
 	"llama.cpp": {
 		prettyLabel: "llama.cpp",
-		docsUrl: "https://github.com/ggerganov/llama.cpp",
+		docsUrl: "https://github.com/ggml-org/llama.cpp",
 		mainTask: "text-generation",
 		displayOnModelPage: isLlamaCppGgufModel,
 		snippet: snippetLlamacpp,
+	},
+	"llama-app": {
+		prettyLabel: "Llama",
+		docsUrl: "https://github.com/ggml-org/Llama-macOS",
+		mainTask: "text-generation",
+		macOSOnly: true,
+		displayOnModelPage: isLlamaCppGgufModel,
+		deeplink: (model, filepath?: string) => {
+			const quantLabel = filepath ? parseGGUFQuantLabel(filepath) : undefined;
+			return new URL(`llama://install?repo=${model.id}${quantLabel ? `&quant=${quantLabel}` : ""}`);
+		},
 	},
 	"node-llama-cpp": {
 		prettyLabel: "node-llama-cpp",
@@ -676,7 +687,7 @@ export const LOCAL_APPS = {
 		prettyLabel: "Atomic Chat",
 		docsUrl: "https://atomic.chat",
 		mainTask: "text-generation",
-		displayOnModelPage: isLlamaCppGgufModel,
+		displayOnModelPage: (model) => isLlamaCppGgufModel(model) || isMlxModel(model),
 		deeplink: (model) => new URL(`atomic-chat://models/huggingface/${model.id}`),
 	},
 	backyard: {
@@ -685,13 +696,6 @@ export const LOCAL_APPS = {
 		mainTask: "text-generation",
 		displayOnModelPage: isLlamaCppGgufModel,
 		deeplink: (model) => new URL(`https://backyard.ai/hf/model/${model.id}`),
-	},
-	sanctum: {
-		prettyLabel: "Sanctum",
-		docsUrl: "https://sanctum.ai",
-		mainTask: "text-generation",
-		displayOnModelPage: isLlamaCppGgufModel,
-		deeplink: (model) => new URL(`sanctum://open_from_hf?model=${model.id}`),
 	},
 	jellybox: {
 		prettyLabel: "Jellybox",
@@ -767,11 +771,18 @@ export const LOCAL_APPS = {
 		snippet: snippetOllama,
 	},
 	unsloth: {
-		prettyLabel: "Unsloth Studio",
-		docsUrl: "https://unsloth.ai/docs/new/studio",
+		prettyLabel: "Unsloth Desktop",
+		docsUrl: "https://unsloth.ai/docs",
 		mainTask: "text-generation",
 		displayOnModelPage: isUnslothModel,
-		snippet: snippetUnsloth,
+		deeplink: (model, filepath) => {
+			const url = new URL("unsloth://open_from_hf");
+			url.searchParams.set("model", model.id);
+			if (filepath) {
+				url.searchParams.set("file", filepath);
+			}
+			return url;
+		},
 	},
 	"docker-model-runner": {
 		prettyLabel: "Docker Model Runner",
@@ -789,7 +800,7 @@ export const LOCAL_APPS = {
 	},
 	pi: {
 		prettyLabel: "Pi",
-		docsUrl: "https://github.com/badlogic/pi-mono",
+		docsUrl: "https://github.com/earendil-works/pi",
 		mainTask: "text-generation",
 		displayOnModelPage: isToolCallingLocalAgentModel,
 		snippet: snippetPi,
@@ -800,6 +811,13 @@ export const LOCAL_APPS = {
 		mainTask: "text-generation",
 		displayOnModelPage: isToolCallingLocalAgentModel,
 		snippet: snippetHermesAgent,
+	},
+	openclaw: {
+		prettyLabel: "OpenClaw",
+		docsUrl: "https://github.com/openclaw/openclaw",
+		mainTask: "text-generation",
+		displayOnModelPage: isToolCallingLocalAgentModel,
+		snippet: snippetOpenClaw,
 	},
 } satisfies Record<string, LocalApp>;
 

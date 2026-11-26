@@ -38,8 +38,9 @@ export interface HardwareSpec {
 	 * sold via OEMs without a public MSRP (H100, MI300X, ...), this is a
 	 * widely-reported street price. For mobile/laptop GPUs that are not sold
 	 * standalone, this is the approximate module/BOM cost. For Apple Silicon
-	 * SoCs, this is the price of a Mac configured with that chip and the
-	 * largest memory option. For CPU "family" entries (e.g. "Xeon 4th Gen",
+	 * and NVIDIA GB10/RTX Spark SoCs, this is the price of a representative
+	 * system configured with that chip and the largest memory option.
+	 * For CPU "family" entries (e.g. "Xeon 4th Gen",
 	 * "Ryzen Zen 4 7000 (Ryzen 9)"), this is the tray/box price of a
 	 * representative flagship SKU at launch.
 	 */
@@ -59,6 +60,13 @@ export interface HardwareSpec {
 	 * the year the family debuted.
 	 */
 	releaseYear: number;
+	/**
+	 * Alternative names this SKU is known by, e.g. the name of a device
+	 * it powers ("DGX Spark" for the GB10) or a chip codename
+	 * ("Strix Halo" for the Ryzen AI Max+ 395). Used for search/filtering.
+	 * An alias doesn't need to be unique: multiple SKUs can share the same one.
+	 */
+	aliases?: string[];
 }
 
 export const DEFAULT_MEMORY_OPTIONS = [
@@ -70,6 +78,13 @@ export const SKUS = {
 		NVIDIA: NVIDIA_SKUS,
 		AMD: AMD_GPU_SKUS,
 		INTEL: {
+			"Arc A380": {
+				tflops: 8.4,
+				memory: [6],
+				msrp: 139,
+				power: 75,
+				releaseYear: 2022,
+			},
 			"Arc A750": {
 				tflops: 34.41,
 				memory: [8],
@@ -203,17 +218,44 @@ export const SKUS = {
 				power: 160,
 				releaseYear: 2025,
 			},
+			"Intel Core Ultra 7 266V": {
+				tflops: 0.56,
+				msrp: 520,
+				power: 37,
+				releaseYear: 2024,
+			},
 			"Intel Core Ultra 7 265KF": {
 				tflops: 1.53,
 				msrp: 400,
 				power: 250,
 				releaseYear: 2024,
 			},
+			"Intel Core 14th Generation (i9)": {
+				tflops: 0.85,
+				msrp: 589,
+				power: 253,
+				releaseYear: 2023,
+				aliases: ["i9-14900K", "i9-14900KF", "i9-14900"],
+			},
 			"Intel Core 14th Generation (i7)": {
 				tflops: 0.8,
 				msrp: 400,
 				power: 253,
 				releaseYear: 2023,
+			},
+			"Intel Core 14th Generation (i5)": {
+				tflops: 0.79,
+				msrp: 319,
+				power: 181,
+				releaseYear: 2023,
+				aliases: ["i5-14600K", "i5-14600KF", "i5-14400"],
+			},
+			"Intel Core 14th Generation (i3)": {
+				tflops: 0.58,
+				msrp: 134,
+				power: 110,
+				releaseYear: 2024,
+				aliases: ["i3-14100", "i3-14100F"],
 			},
 			"Intel Core 13th Generation (i9)": {
 				tflops: 0.85,
@@ -278,13 +320,13 @@ export const SKUS = {
 			"Intel Core 11th Generation (i5)": {
 				tflops: 0.5,
 				msrp: 250,
-				power: 182,
+				power: 251,
 				releaseYear: 2021,
 			},
 			"Intel Core 11th Generation (i3)": {
 				tflops: 0.35,
 				msrp: 150,
-				power: 65,
+				power: 90,
 				releaseYear: 2021,
 			},
 			"Intel Core 10th Generation (i9)": {
@@ -302,14 +344,26 @@ export const SKUS = {
 			"Intel Core 10th Generation (i5)": {
 				tflops: 0.46,
 				msrp: 250,
-				power: 150,
+				power: 182,
 				releaseYear: 2020,
 			},
 			"Intel Core 10th Generation (i3)": {
 				tflops: 0.44,
 				msrp: 150,
-				power: 65,
+				power: 90,
 				releaseYear: 2020,
+			},
+			"Intel Celeron G3930": {
+				tflops: 0.046,
+				msrp: 42,
+				power: 51,
+				releaseYear: 2017,
+			},
+			"Intel Core i5-3230M": {
+				tflops: 0.083,
+				msrp: 225,
+				power: 35,
+				releaseYear: 2013,
 			},
 		},
 		AMD: {
@@ -374,9 +428,9 @@ export const SKUS = {
 				releaseYear: 2017,
 			},
 			"Ryzen 7 3800X (16)": {
-				tflops: 1.73,
+				tflops: 1.15,
 				msrp: 400,
-				power: 105,
+				power: 142,
 				releaseYear: 2019,
 			},
 			"Ryzen Zen 5 9000 (Ryzen 9)": {
@@ -388,13 +442,13 @@ export const SKUS = {
 			"Ryzen Zen 5 9000 (Ryzen 7)": {
 				tflops: 0.56,
 				msrp: 350,
-				power: 105,
+				power: 88,
 				releaseYear: 2024,
 			},
 			"Ryzen Zen 5 9000 (Ryzen 5)": {
 				tflops: 0.56,
 				msrp: 300,
-				power: 105,
+				power: 88,
 				releaseYear: 2024,
 			},
 			"Ryzen Zen 4 7000 (Ryzen 9)": {
@@ -616,6 +670,20 @@ export const SKUS = {
 				memory: [36, 48, 64, 128],
 				msrp: 5_000,
 				power: 110,
+				releaseYear: 2026,
+			},
+			"Apple M5 Ultra": {
+				tflops: 45.6,
+				memory: [96, 256, 512],
+				msrp: 22_299,
+				power: 220,
+				releaseYear: 2026,
+			},
+			"Apple M6": {
+				tflops: 6.2,
+				memory: [16, 24, 32],
+				msrp: 2_400,
+				power: 25,
 				releaseYear: 2026,
 			},
 		},

@@ -43,6 +43,8 @@ export enum GGMLFileQuantizationType {
 	MXFP4_MOE = 38,
 	NVFP4 = 39,
 	Q1_0 = 40,
+	Q2_0 = 41,
+	F8_E4M3 = 42,
 
 	// custom quants used by unsloth
 	// they are not officially a scheme enum value in GGUF, but only here for naming
@@ -55,8 +57,22 @@ export enum GGMLFileQuantizationType {
 }
 
 const ggufQuants = Object.values(GGMLFileQuantizationType).filter((v): v is string => typeof v === "string");
+/**
+ * Names that show up in GGUF *filenames* without being llama_ftype values.
+ *
+ * llama.cpp's gpt-oss conversion names its output after the tensor type it repacks the experts to
+ * (`GGMLQuantizationType.MXFP4`), while `general.file_type` is `MXFP4_MOE` — see
+ * https://github.com/ggml-org/llama.cpp/blob/master/conversion/gpt_oss.py. So the canonical releases
+ * are `gpt-oss-{20b,120b}-MXFP4.gguf`, which no `GGMLFileQuantizationType` name matches.
+ *
+ * Appended last so `MXFP4_MOE` still wins the alternation, instead of matching as `MXFP4` with
+ * sizeVariation `MOE`.
+ */
+const GGUF_QUANT_FILENAME_ALIASES = ["MXFP4"];
 export const GGUF_QUANT_RE = new RegExp(
-	"(?<prefix>UD-)?" + `(?<quant>${ggufQuants.join("|")})` + "(_(?<sizeVariation>[A-Z]+))?",
+	"(?<prefix>UD-)?" +
+		`(?<quant>${[...ggufQuants, ...GGUF_QUANT_FILENAME_ALIASES].join("|")})` +
+		"(_(?<sizeVariation>[A-Z]+))?",
 );
 export const GGUF_QUANT_RE_GLOBAL = new RegExp(GGUF_QUANT_RE, "g");
 
@@ -74,6 +90,7 @@ export const GGUF_QUANT_ORDER: GGMLFileQuantizationType[] = [
 	GGMLFileQuantizationType.F16,
 	GGMLFileQuantizationType.Q8_K_XL,
 	GGMLFileQuantizationType.Q8_0,
+	GGMLFileQuantizationType.F8_E4M3,
 
 	// 6-bit quantizations
 	GGMLFileQuantizationType.Q6_K_XL,
@@ -121,6 +138,7 @@ export const GGUF_QUANT_ORDER: GGMLFileQuantizationType[] = [
 	GGMLFileQuantizationType.IQ2_S,
 	GGMLFileQuantizationType.IQ2_XS,
 	GGMLFileQuantizationType.IQ2_XXS,
+	GGMLFileQuantizationType.Q2_0,
 
 	// 1-bit quantizations
 	GGMLFileQuantizationType.IQ1_S,
@@ -208,4 +226,6 @@ export enum GGMLQuantizationType {
 	MXFP4 = 39,
 	NVFP4 = 40,
 	Q1_0 = 41,
+	Q2_0 = 42,
+	F8_E4M3 = 43,
 }

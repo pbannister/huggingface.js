@@ -24,6 +24,7 @@ import type {
 	QuestionAnsweringOutput,
 	QuestionAnsweringOutputElement,
 	SentenceSimilarityOutput,
+	TextRankingOutput,
 	SummarizationOutput,
 	TableQuestionAnsweringOutput,
 	TextClassificationOutput,
@@ -55,6 +56,7 @@ import type {
 	ObjectDetectionTaskHelper,
 	QuestionAnsweringTaskHelper,
 	SentenceSimilarityTaskHelper,
+	TextRankingTaskHelper,
 	SummarizationTaskHelper,
 	TableQuestionAnsweringTaskHelper,
 	TabularClassificationTaskHelper,
@@ -76,6 +78,7 @@ import { base64FromBytes } from "../utils/base64FromBytes.js";
 import { dataUrlFromBlob } from "../utils/dataUrlFromBlob.js";
 import type { ImageToImageArgs } from "../tasks/cv/imageToImage.js";
 import type { AutomaticSpeechRecognitionArgs } from "../tasks/audio/automaticSpeechRecognition.js";
+import type { AudioToAudioArgs } from "../tasks/audio/audioToAudio.js";
 import { omit } from "../utils/omit.js";
 import type { ImageSegmentationArgs } from "../tasks/cv/imageSegmentation.js";
 import type { ImageToTextArgs } from "../tasks/cv/imageToText.js";
@@ -298,6 +301,15 @@ export class HFInferenceAutomaticSpeechRecognitionTask
 }
 
 export class HFInferenceAudioToAudioTask extends HFInferenceTask implements AudioToAudioTaskHelper {
+	async preparePayloadAsync(args: AudioToAudioArgs): Promise<RequestArgs> {
+		return "data" in args
+			? args
+			: {
+					...omit(args, "inputs"),
+					data: args.inputs,
+				};
+	}
+
 	override async getResponse(response: AudioToAudioOutput[]): Promise<AudioToAudioOutput[]> {
 		if (!Array.isArray(response)) {
 			throw new InferenceClientProviderOutputError(
@@ -591,6 +603,27 @@ export class HFInferenceZeroShotClassificationTask extends HFInferenceTask imple
 			"score" in elem &&
 			typeof elem.label === "string" &&
 			typeof elem.score === "number"
+		);
+	}
+}
+
+export class HFInferenceTextRankingTask extends HFInferenceTask implements TextRankingTaskHelper {
+	override async getResponse(response: unknown): Promise<TextRankingOutput> {
+		if (
+			Array.isArray(response) &&
+			response.every(
+				(item) =>
+					typeof item === "object" &&
+					item !== null &&
+					Number.isInteger(item.index) &&
+					item.index >= 0 &&
+					typeof item.score === "number",
+			)
+		) {
+			return response;
+		}
+		throw new InferenceClientProviderOutputError(
+			"Received malformed response from HF-Inference text-ranking API: expected Array<{ index: number, score: number }>",
 		);
 	}
 }

@@ -1,6 +1,4 @@
 import * as Baseten from "../providers/baseten.js";
-import * as Clarifai from "../providers/clarifai.js";
-import * as BlackForestLabs from "../providers/black-forest-labs.js";
 import * as Cerebras from "../providers/cerebras.js";
 import * as Cohere from "../providers/cohere.js";
 import * as DeepInfra from "../providers/deepinfra.js";
@@ -9,12 +7,11 @@ import * as FeatherlessAI from "../providers/featherless-ai.js";
 import * as Fireworks from "../providers/fireworks-ai.js";
 import * as Groq from "../providers/groq.js";
 import * as HFInference from "../providers/hf-inference.js";
-import * as Hyperbolic from "../providers/hyperbolic.js";
-import * as Nebius from "../providers/nebius.js";
+import * as Humain from "../providers/humain-ai.js";
 import * as Novita from "../providers/novita.js";
 import * as Nscale from "../providers/nscale.js";
-import * as Nvidia from "../providers/nvidia.js";
 import * as OpenAI from "../providers/openai.js";
+import * as OpenRouter from "../providers/openrouter.js";
 import * as OvhCloud from "../providers/ovhcloud.js";
 import * as PublicAI from "../providers/publicai.js";
 import type {
@@ -35,6 +32,7 @@ import type {
 	ObjectDetectionTaskHelper,
 	QuestionAnsweringTaskHelper,
 	SentenceSimilarityTaskHelper,
+	TextRankingTaskHelper,
 	SummarizationTaskHelper,
 	TableQuestionAnsweringTaskHelper,
 	TabularClassificationTaskHelper,
@@ -53,7 +51,6 @@ import type {
 	ZeroShotImageClassificationTaskHelper,
 } from "../providers/providerHelper.js";
 import * as Replicate from "../providers/replicate.js";
-import * as Sambanova from "../providers/sambanova.js";
 import * as Scaleway from "../providers/scaleway.js";
 import * as Together from "../providers/together.js";
 import * as Wavespeed from "../providers/wavespeed.js";
@@ -65,29 +62,29 @@ export const PROVIDERS: Record<InferenceProvider, Partial<Record<InferenceTask, 
 	baseten: {
 		conversational: new Baseten.BasetenConversationalTask(),
 	},
-	"black-forest-labs": {
-		"text-to-image": new BlackForestLabs.BlackForestLabsTextToImageTask(),
-	},
 	cerebras: {
 		conversational: new Cerebras.CerebrasConversationalTask(),
-	},
-	clarifai: {
-		conversational: new Clarifai.ClarifaiConversationalTask(),
 	},
 	cohere: {
 		conversational: new Cohere.CohereConversationalTask(),
 	},
 	deepinfra: {
+		"automatic-speech-recognition": new DeepInfra.DeepInfraAutomaticSpeechRecognitionTask(),
 		conversational: new DeepInfra.DeepInfraConversationalTask(),
+		"feature-extraction": new DeepInfra.DeepInfraFeatureExtractionTask(),
 		"text-generation": new DeepInfra.DeepInfraTextGenerationTask(),
+		"text-to-image": new DeepInfra.DeepInfraTextToImageTask(),
+		"text-to-speech": new DeepInfra.DeepInfraTextToSpeechTask(),
 	},
 	"fal-ai": {
+		"audio-to-audio": new FalAI.FalAIAudioToAudioTask(),
 		"automatic-speech-recognition": new FalAI.FalAIAutomaticSpeechRecognitionTask(),
 		"image-text-to-image": new FalAI.FalAIImageTextToImageTask(),
 		"image-text-to-video": new FalAI.FalAIImageTextToVideoTask(),
 		"image-to-image": new FalAI.FalAIImageToImageTask(),
 		"image-segmentation": new FalAI.FalAIImageSegmentationTask(),
 		"image-to-video": new FalAI.FalAIImageToVideoTask(),
+		"text-to-audio": new FalAI.FalAITextToAudioTask(),
 		"text-to-image": new FalAI.FalAITextToImageTask(),
 		"text-to-speech": new FalAI.FalAITextToSpeechTask(),
 		"text-to-video": new FalAI.FalAITextToVideoTask(),
@@ -116,6 +113,7 @@ export const PROVIDERS: Record<InferenceProvider, Partial<Record<InferenceTask, 
 		"zero-shot-classification": new HFInference.HFInferenceZeroShotClassificationTask(),
 		"image-to-image": new HFInference.HFInferenceImageToImageTask(),
 		"sentence-similarity": new HFInference.HFInferenceSentenceSimilarityTask(),
+		"text-ranking": new HFInference.HFInferenceTextRankingTask(),
 		"table-question-answering": new HFInference.HFInferenceTableQuestionAnsweringTask(),
 		"tabular-classification": new HFInference.HFInferenceTabularClassificationTask(),
 		"text-to-speech": new HFInference.HFInferenceTextToSpeechTask(),
@@ -133,19 +131,12 @@ export const PROVIDERS: Record<InferenceProvider, Partial<Record<InferenceTask, 
 		conversational: new Groq.GroqConversationalTask(),
 		"text-generation": new Groq.GroqTextGenerationTask(),
 	},
-	hyperbolic: {
-		"text-to-image": new Hyperbolic.HyperbolicTextToImageTask(),
-		conversational: new Hyperbolic.HyperbolicConversationalTask(),
-		"text-generation": new Hyperbolic.HyperbolicTextGenerationTask(),
-	},
-	nebius: {
-		"text-to-image": new Nebius.NebiusTextToImageTask(),
-		conversational: new Nebius.NebiusConversationalTask(),
-		"text-generation": new Nebius.NebiusTextGenerationTask(),
-		"feature-extraction": new Nebius.NebiusFeatureExtractionTask(),
+	"humain-ai": {
+		conversational: new Humain.HumainAIConversationalTask(),
 	},
 	novita: {
 		conversational: new Novita.NovitaConversationalTask(),
+		"image-text-to-video": new Novita.NovitaImageTextToVideoTask(),
 		"text-generation": new Novita.NovitaTextGenerationTask(),
 		"text-to-video": new Novita.NovitaTextToVideoTask(),
 	},
@@ -153,11 +144,11 @@ export const PROVIDERS: Record<InferenceProvider, Partial<Record<InferenceTask, 
 		"text-to-image": new Nscale.NscaleTextToImageTask(),
 		conversational: new Nscale.NscaleConversationalTask(),
 	},
-	nvidia: {
-		conversational: new Nvidia.NvidiaConversationalTask(),
-	},
 	openai: {
 		conversational: new OpenAI.OpenAIConversationalTask(),
+	},
+	openrouter: {
+		conversational: new OpenRouter.OpenRouterConversationalTask(),
 	},
 	ovhcloud: {
 		conversational: new OvhCloud.OvhCloudConversationalTask(),
@@ -172,10 +163,6 @@ export const PROVIDERS: Record<InferenceProvider, Partial<Record<InferenceTask, 
 		"text-to-video": new Replicate.ReplicateTextToVideoTask(),
 		"image-to-image": new Replicate.ReplicateImageToImageTask(),
 		"automatic-speech-recognition": new Replicate.ReplicateAutomaticSpeechRecognitionTask(),
-	},
-	sambanova: {
-		conversational: new Sambanova.SambanovaConversationalTask(),
-		"feature-extraction": new Sambanova.SambanovaFeatureExtractionTask(),
 	},
 	scaleway: {
 		conversational: new Scaleway.ScalewayConversationalTask(),
@@ -307,6 +294,10 @@ export function getProviderHelper(
 	provider: InferenceProviderOrPolicy,
 	task: "image-text-to-video",
 ): ImageTextToVideoTaskHelper & TaskProviderHelper;
+export function getProviderHelper(
+	provider: InferenceProviderOrPolicy,
+	task: "text-ranking",
+): TextRankingTaskHelper & TaskProviderHelper;
 export function getProviderHelper(
 	provider: InferenceProviderOrPolicy,
 	task: "sentence-similarity",

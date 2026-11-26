@@ -15,13 +15,24 @@ export async function chatCompletion(
 ): Promise<ChatCompletionOutput> {
 	let providerHelper: ConversationalTaskHelper & TaskProviderHelper;
 	if (args.endpointUrl) {
-		const provider = await resolveProvider(args.provider, args.model, args.endpointUrl);
+		const provider = await resolveProvider(args.provider, args.model, args.endpointUrl, options);
 		providerHelper = getProviderHelper(provider, "conversational");
 	} else if (!args.provider || args.provider === "auto") {
 		// Special case: we have a dedicated auto-router for conversational models. No need to fetch provider mapping.
 		providerHelper = new AutoRouterConversationalTask();
+	} else if (
+		args.model &&
+		args.accessToken?.startsWith("hf_") &&
+		args.provider !== "hf-inference" &&
+		args.provider !== "openrouter"
+	) {
+		// With a HF token, the router resolves `model:provider` server-side, no Hub mapping lookup.
+		// Provider keys still call the provider directly.
+		// `hf-inference` and `openrouter` keep their dedicated routes.
+		providerHelper = new AutoRouterConversationalTask();
+		args = { ...args, model: `${args.model}:${args.provider}` };
 	} else {
-		const provider = await resolveProvider(args.provider, args.model, args.endpointUrl);
+		const provider = await resolveProvider(args.provider, args.model, args.endpointUrl, options);
 		providerHelper = getProviderHelper(provider, "conversational");
 	}
 	const { data: response } = await innerRequest<ChatCompletionOutput>(args, providerHelper, {
